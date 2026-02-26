@@ -12,7 +12,7 @@ using SwiftlyS2.Shared.ProtobufDefinitions;
 
 namespace Whitelist;
 
-[PluginMetadata(Id = "Whitelist", Version = "1.2.9", Name = "Whitelist", Author = "verneri")]
+[PluginMetadata(Id = "Whitelist", Version = "1.3.0", Name = "Whitelist", Author = "verneri")]
 public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
 
     private PluginConfig _config = null!;
@@ -65,9 +65,9 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
         var player = @event.Accessor.GetPlayer("userid");
         if (player == null || !player.IsValid) return HookResult.Continue;
 
-        // 修正方案：獲取該玩家的所有權限標籤，並檢查是否包含所需的權限
-        var playerPermissions = Core.Permission.GetPlayerPermissions(player.SteamID);
-        if (playerPermissions.Contains(_config.PermissionForCommands) || playerPermissions.Contains("*"))
+        // 修正方案：直接透過玩家物件的 Permissions 屬性檢查
+        // 這是 SwiftlyS2 中最穩定、最直接的權限檢查方式
+        if (player.Permissions.HasPermission(_config.PermissionForCommands) || player.Permissions.HasPermission("*"))
             return HookResult.Continue;
 
         var steamId = player.SteamID.ToString();
