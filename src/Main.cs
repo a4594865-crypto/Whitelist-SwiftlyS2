@@ -61,29 +61,36 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
     }
 
     private HookResult OnPlayerConnectFull(EventPlayerConnectFull @event)
+{
+    // 1. 基礎檢查
+    if (!_isEnabled) return HookResult.Continue;
+    if (@event == null) return HookResult.Continue;
+
+    var player = @event.Accessor.GetPlayer("userid");
+    if (player == null || !player.IsValid) return HookResult.Continue;
+
+    // 2. 核心修正：改用最原始的權限檢查邏輯
+    // 在某些 Swiftly 版本中，HasPermission 是掛在 player 上的擴充方法
+    // 為了確保編譯通過，我們直接呼叫 HasPermission
+    if (player.HasPermission(_config.AdminExemptPermission))
     {
-        if (!_isEnabled) return HookResult.Continue;
-        if (@event == null) return HookResult.Continue;
-
-        var player = @event.Accessor.GetPlayer("userid");
-        if (player == null || !player.IsValid) return HookResult.Continue;
-
-        // --- 修正後的權限檢查方式 ---
-        // 直接存取 Permissions 屬性調用 HasPermission，不依賴擴充方法命名空間
-        if (player.Permissions.HasPermission(_config.AdminExemptPermission))
-        {
-            return HookResult.Continue; 
-        }
-
-        var steamId = player.SteamID.ToString();
-
-        if (_config.Mode == 1 && !_whitelist.Contains(steamId))
-            player.Kick("白名單已開啟，你不在准許名單中。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
-        else if (_config.Mode == 2 && _whitelist.Contains(steamId))
-            player.Kick("你被禁止進入此伺服器。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
-
-        return HookResult.Continue;
+        return HookResult.Continue; 
     }
+
+    var steamId = player.SteamID.ToString();
+
+    // 3. 黑白名單判定
+    if (_config.Mode == 1 && !_whitelist.Contains(steamId))
+    {
+        player.Kick("白名單已開啟，你不在准許名單中。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
+    }
+    else if (_config.Mode == 2 && _whitelist.Contains(steamId))
+    {
+        player.Kick("你被禁止進入此伺服器。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
+    }
+
+    return HookResult.Continue;
+}
 
     public override void Unload() { }
     private void OnMapLoad(IOnMapLoadEvent @event) { LoadWhitelist(); }
