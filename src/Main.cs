@@ -12,7 +12,7 @@ using SwiftlyS2.Shared.ProtobufDefinitions;
 
 namespace Whitelist;
 
-[PluginMetadata(Id = "Whitelist", Version = "1.3.0", Name = "Whitelist", Author = "verneri")]
+[PluginMetadata(Id = "Whitelist", Version = "1.3.1", Name = "Whitelist", Author = "verneri")]
 public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
 
     private PluginConfig _config = null!;
@@ -65,10 +65,13 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
         var player = @event.Accessor.GetPlayer("userid");
         if (player == null || !player.IsValid) return HookResult.Continue;
 
-        // 修正方案：直接透過玩家物件的 Permissions 屬性檢查
-        // 這是 SwiftlyS2 中最穩定、最直接的權限檢查方式
-        if (player.Permissions.HasPermission(_config.PermissionForCommands) || player.Permissions.HasPermission("*"))
+        // 【核心修正點】：使用 Core.Permission 物件直接判斷 SteamID 權限
+        // 這樣可以完全避開 IPlayer 物件沒有 Permissions 屬性的問題
+        if (Core.Permission.HasPermission(player.SteamID, _config.PermissionForCommands) || 
+            Core.Permission.HasPermission(player.SteamID, "*"))
+        {
             return HookResult.Continue;
+        }
 
         var steamId = player.SteamID.ToString();
         if (_config.Mode == 1 && !_whitelist.Contains(steamId))
