@@ -12,14 +12,13 @@ using SwiftlyS2.Shared.ProtobufDefinitions;
 
 namespace Whitelist;
 
-[PluginMetadata(Id = "Whitelist", Version = "1.2.5", Name = "Whitelist", Author = "verneri")]
+[PluginMetadata(Id = "Whitelist", Version = "1.2.6", Name = "Whitelist", Author = "verneri")]
 public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
 
     private PluginConfig _config = null!;
     private HashSet<string> _whitelist = new();
     
-    // 關鍵設定：伺服器啟動時，記憶體變數預設為 false (關閉)
-    // 只要不關閉伺服器進程，這個變數在換圖時會一直保留在記憶體中
+    // 預設關閉，換圖保留，伺服器重啟則重置為 false
     private bool _isEnabled = false; 
 
     private string WhitelistFilePath => Path.Combine(Core.PluginPath, "whitelist.txt");
@@ -42,34 +41,30 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
         var provider = services.BuildServiceProvider();
         _config = provider.GetRequiredService<IOptions<PluginConfig>>().Value;
 
-        // 載入白名單 SteamID 名單
         LoadWhitelist();
 
         Core.Event.OnMapLoad += OnMapLoad;
         Core.GameEvent.HookPost<EventPlayerConnectFull>(OnPlayerConnectFull);
 
-        // 註冊指令
+        // 註冊指令：使用正確的 ChatColors
         Core.Command.RegisterCommand($"{_config.AddCommand}", OnWlcommand, false, $"{_config.PermissionForCommands}");
         Core.Command.RegisterCommand($"{_config.RemoveCommand}", OnUwlcommand, false, $"{_config.PermissionForCommands}");
-        
-        // 註冊切換開關指令 (!whitelist)
         Core.Command.RegisterCommand("whitelist", OnToggleWhitelist, false, $"{_config.PermissionForCommands}");
 
-        Core.Logger.LogInformation("[Whitelist] 插件已啟動。目前狀態：預設關閉 (伺服器重啟後會重設為此狀態)");
+        Core.Logger.LogInformation("[Whitelist] 載入完成。目前狀態：預設關閉。");
     }
 
     private void OnToggleWhitelist(ICommandContext context)
     {
         _isEnabled = !_isEnabled;
-        string status = _isEnabled ? "{Lime}已開啟" : "{Red}已關閉";
-        
-        context.Reply($" {FetchColors.LightBlue}[白名單系統]{FetchColors.Default} 目前狀態：{status}");
-        context.Reply($" {FetchColors.LightBlue}[狀態說明]{FetchColors.Default} 換圖會維持狀態，伺服器關閉重啟則會恢復預設關閉。");
+        // 修正：FetchColors -> ChatColors
+        string status = _isEnabled ? $"{ChatColors.Lime}已開啟" : $"{ChatColors.Red}已關閉";
+        context.Reply($" {ChatColors.LightBlue}[白名單系統]{ChatColors.Default} 目前狀態：{status}");
+        context.Reply($" {ChatColors.LightBlue}[提示]{ChatColors.Default} 換圖會維持狀態，重啟伺服器才會恢復關閉。");
     }
 
     private HookResult OnPlayerConnectFull(EventPlayerConnectFull @event)
     {
-        // 只有在 _isEnabled 為 true 時才進行檢查
         if (!_isEnabled) return HookResult.Continue;
 
         if (@event == null) return HookResult.Continue;
@@ -81,42 +76,25 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
         if (_config.Mode == 1) // 白名單模式
         {
             if (!_whitelist.Contains(steamId))
-            {
                 player.Kick("白名單已開啟，你不在准許名單中。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
-            }
         }
         else if (_config.Mode == 2) // 黑名單模式
         {
             if (_whitelist.Contains(steamId))
-            {
                 player.Kick("你已被列入黑名單，禁止進入。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
-            }
         }
 
         return HookResult.Continue;
     }
 
     public override void Unload() { }
-
-    private void OnMapLoad(IOnMapLoadEvent @event) 
-    { 
-        // 換圖時重新載入白名單檔案 (確保名單是最新的)
-        LoadWhitelist(); 
-        
-        // 注意：這裡「不要」寫 _isEnabled = false;
-        // 這樣換地圖時，_isEnabled 會維持原本管理員設定的狀態。
-    }
+    private void OnMapLoad(IOnMapLoadEvent @event) { LoadWhitelist(); }
 
     private void LoadWhitelist()
     {
         _whitelist.Clear();
-        if (!File.Exists(WhitelistFilePath))
-        {
-            File.WriteAllText(WhitelistFilePath, "");
-            return;
-        }
-        var lines = File.ReadAllLines(WhitelistFilePath);
-        foreach (var line in lines)
+        if (!File.Exists(WhitelistFilePath)) { File.WriteAllText(WhitelistFilePath, ""); return; }
+        foreach (var line in File.ReadAllLines(WhitelistFilePath))
         {
             var trimmed = line.Trim();
             if (!string.IsNullOrEmpty(trimmed)) _whitelist.Add(trimmed);
