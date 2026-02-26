@@ -60,30 +60,36 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
         context.Reply($" {{LightBlue}}[白名單系統]{{Default}} 目前狀態：{status}");
     }
 
-    private HookResult OnPlayerConnectFull(EventPlayerConnectFull @event)
+private HookResult OnPlayerConnectFull(EventPlayerConnectFull @event)
+{
+    if (!_isEnabled) return HookResult.Continue;
+    if (@event == null) return HookResult.Continue;
+
+    var player = @event.Accessor.GetPlayer("userid");
+    if (player == null || !player.IsValid) return HookResult.Continue;
+
+    // --- 修正後的 SwiftlyS2 權限檢查邏輯 ---
+    // 1. 檢查玩家是否具備豁免權限 (預設 @css/root)
+    // 注意：如果 player.Permissions 報錯，請確認是否有正確引用 SwiftlyS2.Shared
+    if (player.HasPermission(_config.AdminExemptPermission))
     {
-        if (!_isEnabled) return HookResult.Continue;
-        if (@event == null) return HookResult.Continue;
-
-        var player = @event.Accessor.GetPlayer("userid");
-        if (player == null || !player.IsValid) return HookResult.Continue;
-
-        // --- 修正後的權限檢查方式 ---
-        // 使用 Core.Permission.HasPermission 來檢查玩家是否有豁免權
-        if (Core.Permission.HasPermission(player, _config.AdminExemptPermission))
-        {
-            return HookResult.Continue;
-        }
-
-        var steamId = player.SteamID.ToString();
-
-        if (_config.Mode == 1 && !_whitelist.Contains(steamId))
-            player.Kick("白名單已開啟，你不在准許名單中。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
-        else if (_config.Mode == 2 && _whitelist.Contains(steamId))
-            player.Kick("你被禁止進入此伺服器。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
-
         return HookResult.Continue;
     }
+
+    var steamId = player.SteamID.ToString();
+
+    // 2. 判斷黑/白名單
+    if (_config.Mode == 1 && !_whitelist.Contains(steamId))
+    {
+        player.Kick("白名單已開啟，你不在准許名單中。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
+    }
+    else if (_config.Mode == 2 && _whitelist.Contains(steamId))
+    {
+        player.Kick("你被禁止進入此伺服器。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
+    }
+
+    return HookResult.Continue;
+}
 
     public override void Unload() { }
     private void OnMapLoad(IOnMapLoadEvent @event) { LoadWhitelist(); }
