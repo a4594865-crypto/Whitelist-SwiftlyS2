@@ -21,7 +21,6 @@ jobs:
         include-prerelease: true 
 
     - name: Restore dependencies
-      # 指定去 src 找你的官方原版 csproj
       run: dotnet restore src/Whitelist.csproj
 
     - name: Publish Plugin
@@ -31,6 +30,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: Whitelist-Package
+        # 修正：去 src 資料夾裡面抓產出的檔案
         path: |
-          build/publish/Whitelist/
+          src/build/publish/Whitelist/
           Whitelist.zip
