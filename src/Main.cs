@@ -18,7 +18,7 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
     private PluginConfig _config = null!;
     private HashSet<string> _whitelist = new();
     
-    // 預設關閉，換圖保留，伺服器重啟則重置為 false
+    // 關鍵修改：預設為關閉。因為沒有寫入檔案，伺服器重啟會自動恢復成 false。
     private bool _isEnabled = false; 
 
     private string WhitelistFilePath => Path.Combine(Core.PluginPath, "whitelist.txt");
@@ -41,14 +41,14 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
         var provider = services.BuildServiceProvider();
         _config = provider.GetRequiredService<IOptions<PluginConfig>>().Value;
 
-        LoadWhitelist();
-
         Core.Event.OnMapLoad += OnMapLoad;
         Core.GameEvent.HookPost<EventPlayerConnectFull>(OnPlayerConnectFull);
 
-        // 註冊指令：使用正確的 ChatColors
+        // 註冊指令
         Core.Command.RegisterCommand($"{_config.AddCommand}", OnWlcommand, false, $"{_config.PermissionForCommands}");
         Core.Command.RegisterCommand($"{_config.RemoveCommand}", OnUwlcommand, false, $"{_config.PermissionForCommands}");
+        
+        // 新增：切換開關指令 (!whitelist)
         Core.Command.RegisterCommand("whitelist", OnToggleWhitelist, false, $"{_config.PermissionForCommands}");
 
         Core.Logger.LogInformation("[Whitelist] 載入完成。目前狀態：預設關閉。");
@@ -57,14 +57,14 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
     private void OnToggleWhitelist(ICommandContext context)
     {
         _isEnabled = !_isEnabled;
-        // 修正：FetchColors -> ChatColors
         string status = _isEnabled ? $"{ChatColors.Lime}已開啟" : $"{ChatColors.Red}已關閉";
         context.Reply($" {ChatColors.LightBlue}[白名單系統]{ChatColors.Default} 目前狀態：{status}");
-        context.Reply($" {ChatColors.LightBlue}[提示]{ChatColors.Default} 換圖會維持狀態，重啟伺服器才會恢復關閉。");
+        context.Reply($" {ChatColors.LightBlue}[提示]{ChatColors.Default} 換圖會維持狀態，伺服器重啟則會恢復預設關閉。");
     }
 
     private HookResult OnPlayerConnectFull(EventPlayerConnectFull @event)
     {
+        // 如果開關未開啟，直接跳過檢查
         if (!_isEnabled) return HookResult.Continue;
 
         if (@event == null) return HookResult.Continue;
@@ -93,8 +93,13 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
     private void LoadWhitelist()
     {
         _whitelist.Clear();
-        if (!File.Exists(WhitelistFilePath)) { File.WriteAllText(WhitelistFilePath, ""); return; }
-        foreach (var line in File.ReadAllLines(WhitelistFilePath))
+        if (!File.Exists(WhitelistFilePath))
+        {
+            File.WriteAllText(WhitelistFilePath, "");
+            return;
+        }
+        var lines = File.ReadAllLines(WhitelistFilePath);
+        foreach (var line in lines)
         {
             var trimmed = line.Trim();
             if (!string.IsNullOrEmpty(trimmed)) _whitelist.Add(trimmed);
