@@ -62,41 +62,33 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
 
     private HookResult OnPlayerConnectFull(EventPlayerConnectFull @event)
 {
-    // 1. 基本檢查
     if (!_isEnabled) return HookResult.Continue;
     if (@event == null) return HookResult.Continue;
 
     var player = @event.Accessor.GetPlayer("userid");
     if (player == null || !player.IsValid) return HookResult.Continue;
 
-    // 2. 核心修正：改用路徑存取方式
-    // 在 SwiftlyS2 中，player.Permissions 是一個物件，下面有 HasPermission 方法
-    if (player.Permissions.HasPermission(_config.AdminExemptPermission))
+    // --- 最終相容性寫法 ---
+    // 在 SwiftlyS2 中，如果 player.HasPermission 報錯，
+    // 通常是因為沒抓到擴充方法。請確保頂部有 using SwiftlyS2.Shared.Player;
+    if (player.HasPermission(_config.AdminExemptPermission))
     {
         return HookResult.Continue; 
     }
 
-    // 3. 取得 SteamID 並執行黑白名單判斷
     var steamId = player.SteamID.ToString();
 
-    if (_config.Mode == 1) // 白名單模式
+    if (_config.Mode == 1 && !_whitelist.Contains(steamId))
     {
-        if (!_whitelist.Contains(steamId))
-        {
-            player.Kick("白名單已開啟，你不在准許名單中。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
-        }
+        player.Kick("{LightBlue}[白名單]{Default} 白名單已開啟，你不在名單中。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
     }
-    else if (_config.Mode == 2) // 黑名單模式
+    else if (_config.Mode == 2 && _whitelist.Contains(steamId))
     {
-        if (_whitelist.Contains(steamId))
-        {
-            player.Kick("你被禁止進入此伺服器。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
-        }
+        player.Kick("{LightBlue}[白名單]{Default} 你被禁止進入此伺服器。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
     }
 
     return HookResult.Continue;
 }
-
     public override void Unload() { }
     private void OnMapLoad(IOnMapLoadEvent @event) { LoadWhitelist(); }
 
