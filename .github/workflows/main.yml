@@ -1,0 +1,37 @@
+name: Build Whitelist Plugin
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x # 配合 .csproj 改回 .NET 8 穩定版
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Publish Plugin
+      # 使用 publish 會自動執行你 .csproj 裡的 CreateZip 目標
+      run: dotnet publish --configuration Release
+
+    - name: Upload Build Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: Whitelist-Package
+        # 根據你的 .csproj，產出的 zip 會在 build 目錄的上一層
+        # 或者你可以直接抓取 build 資料夾內的所有東西
+        path: |
+          build/publish/Whitelist/
+          Whitelist.zip
