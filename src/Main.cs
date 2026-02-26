@@ -3,7 +3,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SwiftlyS2.Shared;
-using SwiftlyS2.Shared.Player;
 using SwiftlyS2.Shared.Commands;
 using SwiftlyS2.Shared.Events;
 using SwiftlyS2.Shared.GameEventDefinitions;
@@ -13,7 +12,7 @@ using SwiftlyS2.Shared.ProtobufDefinitions;
 
 namespace Whitelist;
 
-[PluginMetadata(Id = "Whitelist", Version = "1.2.9", Name = "Whitelist", Author = "verneri")]
+[PluginMetadata(Id = "Whitelist", Version = "1.3.0", Name = "Whitelist", Author = "verneri")]
 public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
 
     private PluginConfig _config = null!;
@@ -61,46 +60,30 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
         context.Reply($" {{LightBlue}}[白名單系統]{{Default}} 目前狀態：{status}");
     }
 
-private HookResult OnPlayerConnectFull(EventPlayerConnectFull @event)
-{
-    // 1. 基本安全檢查：插件是否啟用、事件是否有效
-    if (!_isEnabled) return HookResult.Continue;
-    if (@event == null) return HookResult.Continue;
-
-    // 2. 獲取玩家物件並驗證有效性
-    var player = @event.Accessor.GetPlayer("userid");
-    if (player == null || !player.IsValid) return HookResult.Continue;
-
-    // 3. 核心功能：管理員豁免權檢查
-    // 只要擁有在 config.jsonc 設定的 AdminExemptPermission (例如 @css/root)，直接放行
-    if (player.HasPermission(_config.AdminExemptPermission))
+    private HookResult OnPlayerConnectFull(EventPlayerConnectFull @event)
     {
-        return HookResult.Continue; 
-    }
+        if (!_isEnabled) return HookResult.Continue;
+        if (@event == null) return HookResult.Continue;
 
-    // 4. 取得玩家 SteamID 進行清單比對
-    var steamId = player.SteamID.ToString();
+        var player = @event.Accessor.GetPlayer("userid");
+        if (player == null || !player.IsValid) return HookResult.Continue;
 
-    // 5. 根據 Mode 執行踢除邏輯
-    if (_config.Mode == 1) 
-    {
-        // 白名單模式：不在清單內就踢掉
-        if (!_whitelist.Contains(steamId))
+        // --- 修正後的權限檢查方式 ---
+        // 直接存取 Permissions 屬性調用 HasPermission，不依賴擴充方法命名空間
+        if (player.Permissions.HasPermission(_config.AdminExemptPermission))
         {
+            return HookResult.Continue; 
+        }
+
+        var steamId = player.SteamID.ToString();
+
+        if (_config.Mode == 1 && !_whitelist.Contains(steamId))
             player.Kick("白名單已開啟，你不在准許名單中。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
-        }
-    }
-    else if (_config.Mode == 2) 
-    {
-        // 黑名單模式：在清單內就踢掉
-        if (_whitelist.Contains(steamId))
-        {
+        else if (_config.Mode == 2 && _whitelist.Contains(steamId))
             player.Kick("你被禁止進入此伺服器。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
-        }
-    }
 
-    return HookResult.Continue;
-}
+        return HookResult.Continue;
+    }
 
     public override void Unload() { }
     private void OnMapLoad(IOnMapLoadEvent @event) { LoadWhitelist(); }
