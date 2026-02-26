@@ -12,7 +12,7 @@ using SwiftlyS2.Shared.ProtobufDefinitions;
 
 namespace Whitelist;
 
-[PluginMetadata(Id = "Whitelist", Version = "1.4.0", Name = "Whitelist", Author = "verneri")]
+[PluginMetadata(Id = "Whitelist", Version = "1.4.1", Name = "Whitelist", Author = "verneri")]
 public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
 
     private PluginConfig _config = null!;
@@ -60,6 +60,7 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
 
     private HookResult OnPlayerConnectFull(EventPlayerConnectFull @event)
     {
+        // 如果白名單沒開，所有人都能進
         if (!_isEnabled) return HookResult.Continue;
         if (@event == null) return HookResult.Continue;
         var player = @event.Accessor.GetPlayer("userid");
@@ -67,19 +68,15 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
 
         var steamId = player.SteamID.ToString();
 
-        // 檢查是否在 config.jsonc 定義的 Admins 名單中
-        if (_config.Admins != null && _config.Admins.Contains(steamId))
+        // 核心邏輯：只要 SteamID 在 whitelist.txt 裡面，就放行
+        // 管理員請務必在後台或遊戲內透過指令將自己加入 whitelist.txt
+        if (_whitelist.Contains(steamId))
             return HookResult.Continue;
 
+        // 如果不在名單內且模式為白名單(Mode 1)，則踢出
         if (_config.Mode == 1)
         {
-            if (!_whitelist.Contains(steamId))
-                player.Kick("白名單已開啟，你不在准許名單中。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
-        }
-        else if (_config.Mode == 2)
-        {
-            if (_whitelist.Contains(steamId))
-                player.Kick("你被禁止進入此伺服器。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
+            player.Kick("白名單已開啟，你不在准許名單中。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
         }
 
         return HookResult.Continue;
@@ -100,6 +97,18 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
     }
 
     private void SaveWhitelist() { File.WriteAllLines(WhitelistFilePath, _whitelist); }
-    private void OnWlcommand(ICommandContext context) { if (context.Args.Length < 1) return; if (_whitelist.Add(context.Args[0])) { SaveWhitelist(); context.Reply($"已新增 {context.Args[0]}"); } }
-    private void OnUwlcommand(ICommandContext context) { if (context.Args.Length < 1) return; if (_whitelist.Remove(context.Args[0])) { SaveWhitelist(); context.Reply($"已移除 {context.Args[0]}"); } }
+    private void OnWlcommand(ICommandContext context) { 
+        if (context.Args.Length < 1) return; 
+        if (_whitelist.Add(context.Args[0])) { 
+            SaveWhitelist(); 
+            context.Reply($"已新增 {context.Args[0]} 到白名單。"); 
+        } 
+    }
+    private void OnUwlcommand(ICommandContext context) { 
+        if (context.Args.Length < 1) return; 
+        if (_whitelist.Remove(context.Args[0])) { 
+            SaveWhitelist(); 
+            context.Reply($"已從白名單移除 {context.Args[0]}。"); 
+        } 
+    }
 }
