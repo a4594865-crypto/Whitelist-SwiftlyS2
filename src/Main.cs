@@ -12,7 +12,7 @@ using SwiftlyS2.Shared.ProtobufDefinitions;
 
 namespace Whitelist;
 
-[PluginMetadata(Id = "Whitelist", Version = "1.2.8", Name = "Whitelist", Author = "verneri")]
+[PluginMetadata(Id = "Whitelist", Version = "1.2.9", Name = "Whitelist", Author = "verneri")]
 public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
 
     private PluginConfig _config = null!;
@@ -56,7 +56,6 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
     private void OnToggleWhitelist(ICommandContext context)
     {
         _isEnabled = !_isEnabled;
-        // 修正：將顏色標籤放入字串內，並使用雙大括號
         string status = _isEnabled ? "{Lime}已開啟" : "{Red}已關閉";
         context.Reply($" {{LightBlue}}[白名單系統]{{Default}} 目前狀態：{status}");
     }
@@ -69,8 +68,9 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
         var player = @event.Accessor.GetPlayer("userid");
         if (player == null || !player.IsValid) return HookResult.Continue;
 
-        // 修正：SwiftlyS2 的權限檢查正確路徑是 player.Permissions.HasPermission
-        if (player.Permissions.HasPermission(_config.AdminExemptPermission))
+        // --- 修正後的權限檢查方式 ---
+        // 使用 Core.Permission.HasPermission 來檢查玩家是否有豁免權
+        if (Core.Permission.HasPermission(player, _config.AdminExemptPermission))
         {
             return HookResult.Continue;
         }
@@ -107,7 +107,6 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
         if (_whitelist.Add(context.Args[0])) 
         { 
             SaveWhitelist(); 
-            // 修正顏色標籤字串語法
             context.Reply($" {{LightBlue}}[白名單系統]{{Default}} 已新增 {{Green}}{context.Args[0]}"); 
         } 
     }
@@ -118,7 +117,6 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
         if (_whitelist.Remove(context.Args[0])) 
         { 
             SaveWhitelist(); 
-            // 修正顏色標籤字串語法
             context.Reply($" {{LightBlue}}[白名單系統]{{Default}} 已移除 {{Red}}{context.Args[0]}"); 
         } 
     }
