@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Text;
-
 namespace Whitelist;
 
 public class PluginConfig
@@ -11,6 +7,6 @@ public class PluginConfig
     public string RemoveCommand { get; set; } = "wlremove";
     public string PermissionForCommands { get; set; } = "@css/root";
     
-    // 確保這一行存在，主程式才能編譯
+    // 必須有這一行，否則 Main.cs 會找不到定義
     public string AdminExemptPermission { get; set; } = "@css/root"; 
 }
