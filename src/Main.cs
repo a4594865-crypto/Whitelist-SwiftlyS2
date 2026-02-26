@@ -58,15 +58,15 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
         context.Reply($" {{LightBlue}}[白名單系統]{{Default}} 目前狀態：{status}");
     }
 
-    private HookResult OnPlayerConnectFull(EventPlayerConnectFull @event)
+private HookResult OnPlayerConnectFull(EventPlayerConnectFull @event)
     {
         if (!_isEnabled) return HookResult.Continue;
         if (@event == null) return HookResult.Continue;
         var player = @event.Accessor.GetPlayer("userid");
         if (player == null || !player.IsValid) return HookResult.Continue;
 
-        // 修改點：如果玩家擁有管理員權限，直接准許進入，不檢查白名單
-        if (Core.Permission.HasPermission(player.SteamID, _config.PermissionForCommands))
+        // 修正點：使用 HasPermissions (複數) 並確保傳入正確的玩家 SteamID
+        if (Core.Permission.HasPermissions(player.SteamID, _config.PermissionForCommands))
             return HookResult.Continue;
 
         var steamId = player.SteamID.ToString();
