@@ -3,7 +3,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SwiftlyS2.Shared;
-using SwiftlyS2.Shared.Player;
 using SwiftlyS2.Shared.Commands;
 using SwiftlyS2.Shared.Events;
 using SwiftlyS2.Shared.GameEventDefinitions;
@@ -13,7 +12,7 @@ using SwiftlyS2.Shared.ProtobufDefinitions;
 
 namespace Whitelist;
 
-[PluginMetadata(Id = "Whitelist", Version = "1.3.0", Name = "Whitelist", Author = "verneri")]
+[PluginMetadata(Id = "Whitelist", Version = "1.3.1", Name = "Whitelist", Author = "verneri")]
 public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
 
     private PluginConfig _config = null!;
@@ -62,34 +61,34 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
     }
 
     private HookResult OnPlayerConnectFull(EventPlayerConnectFull @event)
-{
-    if (!_isEnabled) return HookResult.Continue;
-    if (@event == null) return HookResult.Continue;
-
-    var player = @event.Accessor.GetPlayer("userid");
-    if (player == null || !player.IsValid) return HookResult.Continue;
-
-    // --- 最終相容性寫法 ---
-    // 在 SwiftlyS2 中，如果 player.HasPermission 報錯，
-    // 通常是因為沒抓到擴充方法。請確保頂部有 using SwiftlyS2.Shared.Player;
-    if (player.HasPermission(_config.AdminExemptPermission))
     {
-        return HookResult.Continue; 
+        if (!_isEnabled) return HookResult.Continue;
+        if (@event == null) return HookResult.Continue;
+
+        var player = @event.Accessor.GetPlayer("userid");
+        if (player == null || !player.IsValid) return HookResult.Continue;
+
+        // --- 核心相容性修正 ---
+        // 不使用擴充方法，直接透過 Permissions 屬性存取 HasPermission 方法
+        if (player.Permissions.HasPermission(_config.AdminExemptPermission))
+        {
+            return HookResult.Continue; 
+        }
+
+        var steamId = player.SteamID.ToString();
+
+        if (_config.Mode == 1 && !_whitelist.Contains(steamId))
+        {
+            player.Kick("{LightBlue}[白名單]{Default} 白名單已開啟，你不在名單中。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
+        }
+        else if (_config.Mode == 2 && _whitelist.Contains(steamId))
+        {
+            player.Kick("{LightBlue}[白名單]{Default} 你被禁止進入此伺服器。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
+        }
+
+        return HookResult.Continue;
     }
 
-    var steamId = player.SteamID.ToString();
-
-    if (_config.Mode == 1 && !_whitelist.Contains(steamId))
-    {
-        player.Kick("{LightBlue}[白名單]{Default} 白名單已開啟，你不在名單中。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
-    }
-    else if (_config.Mode == 2 && _whitelist.Contains(steamId))
-    {
-        player.Kick("{LightBlue}[白名單]{Default} 你被禁止進入此伺服器。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
-    }
-
-    return HookResult.Continue;
-}
     public override void Unload() { }
     private void OnMapLoad(IOnMapLoadEvent @event) { LoadWhitelist(); }
 
