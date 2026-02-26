@@ -3,7 +3,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SwiftlyS2.Shared;
-using SwiftlyS2.Shared.Player;
 using SwiftlyS2.Shared.Commands;
 using SwiftlyS2.Shared.Events;
 using SwiftlyS2.Shared.GameEventDefinitions;
@@ -63,31 +62,36 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
 
     private HookResult OnPlayerConnectFull(EventPlayerConnectFull @event)
 {
-    // 1. 基礎檢查
+    // 1. 基本檢查
     if (!_isEnabled) return HookResult.Continue;
     if (@event == null) return HookResult.Continue;
 
     var player = @event.Accessor.GetPlayer("userid");
     if (player == null || !player.IsValid) return HookResult.Continue;
 
-    // 2. 核心修正：改用最原始的權限檢查邏輯
-    // 在某些 Swiftly 版本中，HasPermission 是掛在 player 上的擴充方法
-    // 為了確保編譯通過，我們直接呼叫 HasPermission
-    if (player.HasPermission(_config.AdminExemptPermission))
+    // 2. 核心修正：改用路徑存取方式
+    // 在 SwiftlyS2 中，player.Permissions 是一個物件，下面有 HasPermission 方法
+    if (player.Permissions.HasPermission(_config.AdminExemptPermission))
     {
         return HookResult.Continue; 
     }
 
+    // 3. 取得 SteamID 並執行黑白名單判斷
     var steamId = player.SteamID.ToString();
 
-    // 3. 黑白名單判定
-    if (_config.Mode == 1 && !_whitelist.Contains(steamId))
+    if (_config.Mode == 1) // 白名單模式
     {
-        player.Kick("白名單已開啟，你不在准許名單中。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
+        if (!_whitelist.Contains(steamId))
+        {
+            player.Kick("白名單已開啟，你不在准許名單中。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
+        }
     }
-    else if (_config.Mode == 2 && _whitelist.Contains(steamId))
+    else if (_config.Mode == 2) // 黑名單模式
     {
-        player.Kick("你被禁止進入此伺服器。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
+        if (_whitelist.Contains(steamId))
+        {
+            player.Kick("你被禁止進入此伺服器。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
+        }
     }
 
     return HookResult.Continue;
