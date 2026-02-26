@@ -12,7 +12,7 @@ using SwiftlyS2.Shared.ProtobufDefinitions;
 
 namespace Whitelist;
 
-[PluginMetadata(Id = "Whitelist", Version = "1.2.6", Name = "Whitelist", Author = "verneri")]
+[PluginMetadata(Id = "Whitelist", Version = "1.2.7", Name = "Whitelist", Author = "verneri")]
 public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
 
     private PluginConfig _config = null!;
@@ -54,7 +54,6 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
     private void OnToggleWhitelist(ICommandContext context)
     {
         _isEnabled = !_isEnabled;
-        // 直接用字串標籤，避開所有類別名稱報錯
         string status = _isEnabled ? "{Lime}已開啟" : "{Red}已關閉";
         context.Reply($" {{LightBlue}}[白名單系統]{{Default}} 目前狀態：{status}");
     }
@@ -65,6 +64,10 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
         if (@event == null) return HookResult.Continue;
         var player = @event.Accessor.GetPlayer("userid");
         if (player == null || !player.IsValid) return HookResult.Continue;
+
+        // 修改點：如果玩家擁有管理員權限，直接准許進入，不檢查白名單
+        if (Core.Permission.HasPermission(player.SteamID, _config.PermissionForCommands))
+            return HookResult.Continue;
 
         var steamId = player.SteamID.ToString();
         if (_config.Mode == 1 && !_whitelist.Contains(steamId))
