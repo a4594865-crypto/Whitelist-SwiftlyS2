@@ -12,7 +12,7 @@ using SwiftlyS2.Shared.ProtobufDefinitions;
 
 namespace Whitelist;
 
-[PluginMetadata(Id = "Whitelist", Version = "1.3.7", Name = "Whitelist", Author = "verneri")]
+[PluginMetadata(Id = "Whitelist", Version = "1.3.9", Name = "Whitelist", Author = "verneri")]
 public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
 
     private PluginConfig _config = null!;
@@ -44,7 +44,6 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
         Core.Event.OnMapLoad += OnMapLoad;
         Core.GameEvent.HookPost<EventPlayerConnectFull>(OnPlayerConnectFull);
 
-        // 指令註冊部分 SDK 是沒問題的，因為它內部會處理權限字串
         Core.Command.RegisterCommand($"{_config.AddCommand}", OnWlcommand, false, $"{_config.PermissionForCommands}");
         Core.Command.RegisterCommand($"{_config.RemoveCommand}", OnUwlcommand, false, $"{_config.PermissionForCommands}");
         Core.Command.RegisterCommand("whitelist", OnToggleWhitelist, false, $"{_config.PermissionForCommands}");
@@ -68,19 +67,23 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
 
         var steamId = player.SteamID.ToString();
 
-        // 【暴力解法】：直接檢查該玩家是否在你的白名單 .txt 裡
-        // 為了讓管理員不受限，最快的方法就是讓管理員把自己的 ID 也加進 whitelist.txt
-        // 這樣就不用去求那個一直報錯的 PermissionManager 了
-        if (_whitelist.Contains(steamId))
+        // 【權限避難方案】：檢查玩家是否在 config.jsonc 的 Admins 清單中
+        if (_config.Admins != null && _config.Admins.Contains(steamId))
             return HookResult.Continue;
 
         if (_config.Mode == 1) // 白名單模式
         {
-            player.Kick("白名單已開啟，你不在准許名單中。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
+            if (!_whitelist.Contains(steamId))
+            {
+                player.Kick("白名單已開啟，你不在准許名單中。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
+            }
         }
-        else if (_config.Mode == 2) // 黑名單模式 (如果 ID 在名單內，上面已經 Return 了，所以這裡不會執行到)
+        else if (_config.Mode == 2) // 黑名單模式
         {
-            // 這裡保留空邏輯或根據需求微調
+            if (_whitelist.Contains(steamId))
+            {
+                player.Kick("你被禁止進入此伺服器。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
+            }
         }
 
         return HookResult.Continue;
