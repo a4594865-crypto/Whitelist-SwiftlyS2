@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SwiftlyS2.Shared;
+using SwiftlyS2.Shared.Player;
 using SwiftlyS2.Shared.Commands;
 using SwiftlyS2.Shared.Events;
 using SwiftlyS2.Shared.GameEventDefinitions;
@@ -62,30 +63,40 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
 
 private HookResult OnPlayerConnectFull(EventPlayerConnectFull @event)
 {
+    // 1. 基本安全檢查：插件是否啟用、事件是否有效
     if (!_isEnabled) return HookResult.Continue;
     if (@event == null) return HookResult.Continue;
 
+    // 2. 獲取玩家物件並驗證有效性
     var player = @event.Accessor.GetPlayer("userid");
     if (player == null || !player.IsValid) return HookResult.Continue;
 
-    // --- 修正後的 SwiftlyS2 權限檢查邏輯 ---
-    // 1. 檢查玩家是否具備豁免權限 (預設 @css/root)
-    // 注意：如果 player.Permissions 報錯，請確認是否有正確引用 SwiftlyS2.Shared
+    // 3. 核心功能：管理員豁免權檢查
+    // 只要擁有在 config.jsonc 設定的 AdminExemptPermission (例如 @css/root)，直接放行
     if (player.HasPermission(_config.AdminExemptPermission))
     {
-        return HookResult.Continue;
+        return HookResult.Continue; 
     }
 
+    // 4. 取得玩家 SteamID 進行清單比對
     var steamId = player.SteamID.ToString();
 
-    // 2. 判斷黑/白名單
-    if (_config.Mode == 1 && !_whitelist.Contains(steamId))
+    // 5. 根據 Mode 執行踢除邏輯
+    if (_config.Mode == 1) 
     {
-        player.Kick("白名單已開啟，你不在准許名單中。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
+        // 白名單模式：不在清單內就踢掉
+        if (!_whitelist.Contains(steamId))
+        {
+            player.Kick("白名單已開啟，你不在准許名單中。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
+        }
     }
-    else if (_config.Mode == 2 && _whitelist.Contains(steamId))
+    else if (_config.Mode == 2) 
     {
-        player.Kick("你被禁止進入此伺服器。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
+        // 黑名單模式：在清單內就踢掉
+        if (_whitelist.Contains(steamId))
+        {
+            player.Kick("你被禁止進入此伺服器。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
+        }
     }
 
     return HookResult.Continue;
