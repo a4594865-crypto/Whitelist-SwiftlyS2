@@ -3,6 +3,8 @@ name: Build Whitelist Plugin
 on:
   push:
     branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
 
 jobs:
   build:
@@ -15,9 +17,11 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: 8.0.x 
+        dotnet-version: '10.0.x'
+        include-prerelease: true 
 
     - name: Restore dependencies
+      # 指定去 src 找你的官方原版 csproj
       run: dotnet restore src/Whitelist.csproj
 
     - name: Publish Plugin
