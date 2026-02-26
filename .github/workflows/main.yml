@@ -17,21 +17,20 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: 8.0.x # 配合 .csproj 改回 .NET 8 穩定版
+        dotnet-version: 8.0.x 
 
     - name: Restore dependencies
-      run: dotnet restore
+      # 明確指向 src 資料夾內的專案檔
+      run: dotnet restore src/Whitelist.csproj
 
     - name: Publish Plugin
-      # 使用 publish 會自動執行你 .csproj 裡的 CreateZip 目標
-      run: dotnet publish --configuration Release
+      # 執行 publish，會觸發 csproj 裡的 CreateZip
+      run: dotnet publish src/Whitelist.csproj --configuration Release
 
     - name: Upload Build Artifacts
       uses: actions/upload-artifact@v4
       with:
         name: Whitelist-Package
-        # 根據你的 .csproj，產出的 zip 會在 build 目錄的上一層
-        # 或者你可以直接抓取 build 資料夾內的所有東西
         path: |
           build/publish/Whitelist/
           Whitelist.zip
