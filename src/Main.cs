@@ -12,11 +12,13 @@ using SwiftlyS2.Shared.ProtobufDefinitions;
 
 namespace Whitelist;
 
-[PluginMetadata(Id = "Whitelist", Version = "1.2.2", Name = "Whitelist", Author = "verneri")]
+[PluginMetadata(Id = "Whitelist", Version = "1.3.8", Name = "Whitelist", Author = "verneri")]
 public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
 
     private PluginConfig _config = null!;
     private HashSet<string> _whitelist = new();
+    
+    // 預設為 false。伺服器重啟時，記憶體重置，這裡會變回 false。
     private bool _isEnabled = false; 
 
     private string WhitelistFilePath => Path.Combine(Core.PluginPath, "whitelist.txt");
@@ -50,11 +52,12 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
         Core.Command.RegisterCommand($"{_config.RemoveCommand}", OnUwlcommand, false, $"{_config.PermissionForCommands}");
         Core.Command.RegisterCommand("whitelist", OnToggleWhitelist, false, $"{_config.PermissionForCommands}");
 
-        Core.Logger.LogInformation("[Whitelist] 載入完成。管理員豁免標籤: {Permission}", _config.AdminExemptPermission);
+        Core.Logger.LogInformation("[Whitelist] 載入完成。重啟預設狀態：關閉");
     }
 
     private void OnToggleWhitelist(ICommandContext context)
     {
+        // 只有打指令才會切換狀態
         _isEnabled = !_isEnabled;
         string status = _isEnabled ? "{Lime}已開啟" : "{Red}已關閉";
         context.Reply($" {{LightBlue}}[白名單系統]{{Default}} 目前狀態：{status}");
@@ -62,15 +65,14 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
 
     private HookResult OnPlayerConnectFull(EventPlayerConnectFull @event)
     {
+        // 檢查記憶體變數狀態
         if (!_isEnabled) return HookResult.Continue;
+        
         if (@event == null) return HookResult.Continue;
-
         var player = @event.Accessor.GetPlayer("userid");
         if (player == null || !player.IsValid) return HookResult.Continue;
 
-        // --- 核心修正：使用全域權限檢查 ---
-        // 在 SwiftlyS2 1.1.3 中，這是最穩定的檢查方式
-        // 傳入玩家的 SteamID 與 設定的權限標籤
+        // 管理員豁免檢查
         if (Core.Permission.PlayerHasPermission(player.SteamID, _config.AdminExemptPermission))
         {
             return HookResult.Continue; 
@@ -91,7 +93,13 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
     }
 
     public override void Unload() { }
-    private void OnMapLoad(IOnMapLoadEvent @event) { LoadWhitelist(); }
+
+    private void OnMapLoad(IOnMapLoadEvent @event) 
+    { 
+        // 換地圖只重新讀取名單文件 (防止手動改 txt 後沒生效)
+        // 不去動 _isEnabled，這樣它就會維持換圖前的狀態
+        LoadWhitelist(); 
+    }
 
     private void LoadWhitelist()
     {
