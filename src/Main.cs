@@ -12,7 +12,7 @@ using SwiftlyS2.Shared.ProtobufDefinitions;
 
 namespace Whitelist;
 
-[PluginMetadata(Id = "Whitelist", Version = "1.4.1", Name = "Whitelist", Author = "verneri")]
+[PluginMetadata(Id = "Whitelist", Version = "1.5.0", Name = "Whitelist", Author = "verneri")]
 public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
 
     private PluginConfig _config = null!;
@@ -47,8 +47,6 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
         Core.Command.RegisterCommand($"{_config.AddCommand}", OnWlcommand, false, $"{_config.PermissionForCommands}");
         Core.Command.RegisterCommand($"{_config.RemoveCommand}", OnUwlcommand, false, $"{_config.PermissionForCommands}");
         Core.Command.RegisterCommand("whitelist", OnToggleWhitelist, false, $"{_config.PermissionForCommands}");
-
-        Core.Logger.LogInformation("[Whitelist] 載入完成。");
     }
 
     private void OnToggleWhitelist(ICommandContext context)
@@ -60,24 +58,24 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
 
     private HookResult OnPlayerConnectFull(EventPlayerConnectFull @event)
     {
-        // 如果白名單沒開，所有人都能進
         if (!_isEnabled) return HookResult.Continue;
-        if (@event == null) return HookResult.Continue;
+
         var player = @event.Accessor.GetPlayer("userid");
         if (player == null || !player.IsValid) return HookResult.Continue;
 
-        var steamId = player.SteamID.ToString();
+        // 核心修正：延遲 1 秒檢查。
+        // 這樣可以確保 SDK 已經載入完 permissions.jsonc，且避免編譯器在 Connect 事件抓不到權限方法
+        Core.NextFrame(() => {
+            if (!player.IsValid) return;
 
-        // 核心邏輯：只要 SteamID 在 whitelist.txt 裡面，就放行
-        // 管理員請務必在後台或遊戲內透過指令將自己加入 whitelist.txt
-        if (_whitelist.Contains(steamId))
-            return HookResult.Continue;
+            // 如果是管理員 (擁有你設定的 admin.ban 權限)，直接結束，不往下執行踢人
+            if (Core.Permission.HasPermission(player.SteamID, _config.PermissionForCommands))
+                return;
 
-        // 如果不在名單內且模式為白名單(Mode 1)，則踢出
-        if (_config.Mode == 1)
-        {
-            player.Kick("白名單已開啟，你不在准許名單中。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
-        }
+            var steamId = player.SteamID.ToString();
+            if (_config.Mode == 1 && !_whitelist.Contains(steamId))
+                player.Kick("白名單已開啟，你不在准許名單中。");
+        });
 
         return HookResult.Continue;
     }
@@ -99,16 +97,10 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
     private void SaveWhitelist() { File.WriteAllLines(WhitelistFilePath, _whitelist); }
     private void OnWlcommand(ICommandContext context) { 
         if (context.Args.Length < 1) return; 
-        if (_whitelist.Add(context.Args[0])) { 
-            SaveWhitelist(); 
-            context.Reply($"已新增 {context.Args[0]} 到白名單。"); 
-        } 
+        if (_whitelist.Add(context.Args[0])) { SaveWhitelist(); context.Reply($"已新增 {context.Args[0]}"); } 
     }
     private void OnUwlcommand(ICommandContext context) { 
         if (context.Args.Length < 1) return; 
-        if (_whitelist.Remove(context.Args[0])) { 
-            SaveWhitelist(); 
-            context.Reply($"已從白名單移除 {context.Args[0]}。"); 
-        } 
+        if (_whitelist.Remove(context.Args[0])) { SaveWhitelist(); context.Reply($"已移除 {context.Args[0]}"); } 
     }
 }
