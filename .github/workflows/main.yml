@@ -17,14 +17,14 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: 8.0.x 
+        # 改為 10.0.x 並使用 preview 分支，因為 .NET 10 目前非常新
+        dotnet-version: '10.0.x'
+        include-prerelease: true 
 
     - name: Restore dependencies
-      # 明確指向 src 資料夾內的專案檔
       run: dotnet restore src/Whitelist.csproj
 
     - name: Publish Plugin
-      # 執行 publish，會觸發 csproj 裡的 CreateZip
       run: dotnet publish src/Whitelist.csproj --configuration Release
 
     - name: Upload Build Artifacts
