@@ -61,33 +61,35 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
     }
 
     private HookResult OnPlayerConnectFull(EventPlayerConnectFull @event)
+{
+    if (!_isEnabled) return HookResult.Continue;
+    if (@event == null) return HookResult.Continue;
+
+    var player = @event.Accessor.GetPlayer("userid");
+    if (player == null || !player.IsValid) return HookResult.Continue;
+
+    // --- SwiftlyS2 1.1.3 相容性寫法 ---
+    // 嘗試使用 HasPermission 檢查。
+    // 如果編譯器報錯說 IPlayer 不包含 HasPermission，請將下面這行改為：
+    // if (Core.Permission.HasPermission(player.Slot, _config.AdminExemptPermission))
+    if (player.HasPermission(_config.AdminExemptPermission))
     {
-        if (!_isEnabled) return HookResult.Continue;
-        if (@event == null) return HookResult.Continue;
-
-        var player = @event.Accessor.GetPlayer("userid");
-        if (player == null || !player.IsValid) return HookResult.Continue;
-
-        // --- 核心相容性修正 ---
-        // 不使用擴充方法，直接透過 Permissions 屬性存取 HasPermission 方法
-        if (player.Permissions.HasPermission(_config.AdminExemptPermission))
-        {
-            return HookResult.Continue; 
-        }
-
-        var steamId = player.SteamID.ToString();
-
-        if (_config.Mode == 1 && !_whitelist.Contains(steamId))
-        {
-            player.Kick("{LightBlue}[白名單]{Default} 白名單已開啟，你不在名單中。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
-        }
-        else if (_config.Mode == 2 && _whitelist.Contains(steamId))
-        {
-            player.Kick("{LightBlue}[白名單]{Default} 你被禁止進入此伺服器。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
-        }
-
-        return HookResult.Continue;
+        return HookResult.Continue; 
     }
+
+    var steamId = player.SteamID.ToString();
+
+    if (_config.Mode == 1 && !_whitelist.Contains(steamId))
+    {
+        player.Kick("{LightBlue}[白名單]{Default} 白名單模式已開啟，你不在名單中。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
+    }
+    else if (_config.Mode == 2 && _whitelist.Contains(steamId))
+    {
+        player.Kick("{LightBlue}[白名單]{Default} 你已被伺服器封鎖。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
+    }
+
+    return HookResult.Continue;
+}
 
     public override void Unload() { }
     private void OnMapLoad(IOnMapLoadEvent @event) { LoadWhitelist(); }
