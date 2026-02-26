@@ -12,7 +12,7 @@ using SwiftlyS2.Shared.ProtobufDefinitions;
 
 namespace Whitelist;
 
-[PluginMetadata(Id = "Whitelist", Version = "1.3.5", Name = "Whitelist", Author = "verneri")]
+[PluginMetadata(Id = "Whitelist", Version = "1.3.6", Name = "Whitelist", Author = "verneri")]
 public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
 
     private PluginConfig _config = null!;
@@ -65,9 +65,9 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
         var player = @event.Accessor.GetPlayer("userid");
         if (player == null || !player.IsValid) return HookResult.Continue;
 
-        // 根據官方文檔推薦的權限檢查邏輯：
-        // 管理員（擁有 admin.ban 權限者）不論是否在名單內皆可進入
-        if (Core.Permission.HasPermission(player.SteamID, _config.PermissionForCommands))
+        // 根據官方文檔範例，直接對 player 物件使用 HasPermission
+        // 這會自動呼叫對應的權限檢查邏輯
+        if (player.HasPermission(_config.PermissionForCommands))
             return HookResult.Continue;
 
         var steamId = player.SteamID.ToString();
