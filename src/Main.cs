@@ -12,7 +12,7 @@ using SwiftlyS2.Shared.ProtobufDefinitions;
 
 namespace Whitelist;
 
-[PluginMetadata(Id = "Whitelist", Version = "1.3.9", Name = "Whitelist", Author = "verneri & 秋風的夜 (Fix)")]
+[PluginMetadata(Id = "Whitelist", Version = "1.4.0", Name = "Whitelist", Author = "verneri & 秋風的夜 (Fix)")]
 public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
 
     private PluginConfig _config = null!;
@@ -52,7 +52,7 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
         Core.Command.RegisterCommand($"{_config.RemoveCommand}", OnUwlcommand, false, $"{_config.PermissionForCommands}");
         Core.Command.RegisterCommand("whitelist", OnToggleWhitelist, false, $"{_config.PermissionForCommands}");
 
-        Core.Logger.LogInformation("[Whitelist] 載入完成。已修正顏色代碼解析問題。");
+        Core.Logger.LogInformation("[Whitelist] 載入完成。已改用十六進位顏色代碼修正顯示問題。");
     }
 
     private void OnToggleWhitelist(ICommandContext context)
@@ -60,11 +60,12 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
         // 只有打指令才會切換狀態
         _isEnabled = !_isEnabled;
 
-        // 【修正點】將顏色標籤單獨抽出，確保 Swiftly 的 Reply 函式能正確解析標籤
-        string colorTag = _isEnabled ? "{Lime}" : "{Red}";
+        // 【修正點】改用 CS2 原生顏色代碼
+        // \x0B = 淺藍, \x06 = 亮綠, \x02 = 紅色, \x01 = 預設白
+        string colorCode = _isEnabled ? "\x06" : "\x02";
         string statusText = _isEnabled ? "已開啟" : "已關閉";
 
-        context.Reply($" {{LightBlue}}[白名單系統]{{Default}} 目前狀態：{colorTag}{statusText}");
+        context.Reply($" \x0B[白名單系統]\x01 目前狀態：{colorCode}{statusText}");
     }
 
     private HookResult OnPlayerConnectFull(EventPlayerConnectFull @event)
@@ -86,11 +87,12 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
 
         if (_config.Mode == 1 && !_whitelist.Contains(steamId))
         {
-            player.Kick("{LightBlue}[白名單]{Default} 白名單模式已開啟，你不在准許名單中。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
+            // Kick 訊息也同步改用原生代碼
+            player.Kick("\x0B[白名單]\x01 白名單模式已開啟，你不在准許名單中。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
         }
         else if (_config.Mode == 2 && _whitelist.Contains(steamId))
         {
-            player.Kick("{LightBlue}[白名單]{Default} 你已被禁止進入此伺服器。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
+            player.Kick("\x0B[白名單]\x01 你已被禁止進入此伺服器。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
         }
 
         return HookResult.Continue;
@@ -100,8 +102,6 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
 
     private void OnMapLoad(IOnMapLoadEvent @event) 
     { 
-        // 換地圖只重新讀取名單文件 (防止手動改 txt 後沒生效)
-        // 不去動 _isEnabled，這樣它就會維持換圖前的狀態
         LoadWhitelist(); 
     }
 
@@ -124,7 +124,7 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
         if (_whitelist.Add(context.Args[0])) 
         { 
             SaveWhitelist(); 
-            context.Reply($" {{LightBlue}}[白名單系統]{{Default}} 已新增 {{Green}}{context.Args[0]}"); 
+            context.Reply($" \x0B[白名單系統]\x01 已新增 \x06{context.Args[0]}"); 
         } 
     }
 
@@ -134,7 +134,7 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
         if (_whitelist.Remove(context.Args[0])) 
         { 
             SaveWhitelist(); 
-            context.Reply($" {{LightBlue}}[白名單系統]{{Default}} 已移除 {{Red}}{context.Args[0]}"); 
+            context.Reply($" \x0B[白名單系統]\x01 已移除 \x02{context.Args[0]}"); 
         } 
     }
 }
