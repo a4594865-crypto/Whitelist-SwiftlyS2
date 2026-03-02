@@ -65,7 +65,7 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
         string colorCode = _isEnabled ? "\x06" : "\x02";
         string statusText = _isEnabled ? "已開啟" : "已關閉";
 
-        context.Reply($" \x0B[白名單系統]\x01 目前狀態：{colorCode}{statusText}");
+        context.Reply($" \x01[\x061 v 1 對 戰 模 式 \x01] 白名單目前狀態：{colorCode}{statusText}");
     }
 
     private HookResult OnPlayerConnectFull(EventPlayerConnectFull @event)
