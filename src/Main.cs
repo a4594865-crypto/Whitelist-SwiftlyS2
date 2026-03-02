@@ -134,4 +134,3 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
         } 
     }
 }
-  為什麼管理員沒有免疫?
