@@ -12,13 +12,13 @@ using SwiftlyS2.Shared.ProtobufDefinitions;
 
 namespace Whitelist;
 
-[PluginMetadata(Id = "Whitelist", Version = "1.3.8", Name = "Whitelist", Author = "verneri")]
+[PluginMetadata(Id = "Whitelist", Version = "1.3.9", Name = "Whitelist", Author = "verneri & 秋風的夜 (Fix)")]
 public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
 
     private PluginConfig _config = null!;
     private HashSet<string> _whitelist = new();
     
-    // 預設為 false。伺服器重啟時，記憶體重置，這裡會變回 false。
+    // 記憶體變數，重啟伺服器預設為關閉
     private bool _isEnabled = false; 
 
     private string WhitelistFilePath => Path.Combine(Core.PluginPath, "whitelist.txt");
@@ -52,12 +52,11 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
         Core.Command.RegisterCommand($"{_config.RemoveCommand}", OnUwlcommand, false, $"{_config.PermissionForCommands}");
         Core.Command.RegisterCommand("whitelist", OnToggleWhitelist, false, $"{_config.PermissionForCommands}");
 
-        Core.Logger.LogInformation("[Whitelist] 載入完成。重啟預設狀態：關閉");
+        Core.Logger.LogInformation("[Whitelist] 修正版載入完成。管理員豁免功能已優化。");
     }
 
     private void OnToggleWhitelist(ICommandContext context)
     {
-        // 只有打指令才會切換狀態
         _isEnabled = !_isEnabled;
         string status = _isEnabled ? "{Lime}已開啟" : "{Red}已關閉";
         context.Reply($" {{LightBlue}}[白名單系統]{{Default}} 目前狀態：{status}");
@@ -65,26 +64,33 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
 
     private HookResult OnPlayerConnectFull(EventPlayerConnectFull @event)
     {
-        // 檢查記憶體變數狀態
+        // 1. 如果白名單沒開啟，直接放行
         if (!_isEnabled) return HookResult.Continue;
         
         if (@event == null) return HookResult.Continue;
         var player = @event.Accessor.GetPlayer("userid");
         if (player == null || !player.IsValid) return HookResult.Continue;
 
-        // 管理員豁免檢查
-        if (Core.Permission.PlayerHasPermission(player.SteamID, _config.AdminExemptPermission))
+        // 2. 獲取 SteamID64 (ulong 格式)
+        ulong steamId64 = player.SteamID;
+
+        // 3. 管理員豁免檢查 (核心修正點)
+        // 檢查是否擁有 config 設定的權限，或是否具備 Swiftly 的 admin 標籤
+        if (Core.Permission.PlayerHasPermission(steamId64, _config.AdminExemptPermission) || 
+            Core.Permission.PlayerHasPermission(steamId64, "admin.*"))
         {
+            Core.Logger.LogInformation($"[Whitelist] 管理員 {player.PlayerName} ({steamId64}) 已自動豁免。");
             return HookResult.Continue; 
         }
 
-        var steamId = player.SteamID.ToString();
+        var sID = steamId64.ToString();
 
-        if (_config.Mode == 1 && !_whitelist.Contains(steamId))
+        // 4. 白名單模式判斷
+        if (_config.Mode == 1 && !_whitelist.Contains(sID))
         {
             player.Kick("{LightBlue}[白名單]{Default} 白名單模式已開啟，你不在准許名單中。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
         }
-        else if (_config.Mode == 2 && _whitelist.Contains(steamId))
+        else if (_config.Mode == 2 && _whitelist.Contains(sID))
         {
             player.Kick("{LightBlue}[白名單]{Default} 你已被禁止進入此伺服器。", ENetworkDisconnectionReason.NETWORK_DISCONNECT_REJECT_RESERVED_FOR_LOBBY);
         }
@@ -96,8 +102,6 @@ public partial class Whitelist(ISwiftlyCore core) : BasePlugin(core) {
 
     private void OnMapLoad(IOnMapLoadEvent @event) 
     { 
-        // 換地圖只重新讀取名單文件 (防止手動改 txt 後沒生效)
-        // 不去動 _isEnabled，這樣它就會維持換圖前的狀態
         LoadWhitelist(); 
     }
 
